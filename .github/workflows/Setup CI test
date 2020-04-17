@@ -1,0 +1,68 @@
+name: $(Date:yyyyMMdd)$(Rev:.r)
+trigger: none
+schedules:
+- cron: "0 5 * * 1-5"
+  displayName: Daily Automated Tests
+  branches:
+    include:
+    - master
+pr: none
+resources:
+  pipelines:
+  - pipeline: Build
+    source: ChatBot Build 
+    branch: master
+    trigger:
+      branches:
+        include: [master]
+stages:
+- stage: DEV
+  jobs:
+  - deployment: DEV
+    displayName: DEV
+    pool: AI-TD-Windows-Build-Agents
+    environment: DEV
+    variables:
+      - template: variables/variables.DEV.yaml    
+      - template: variables/functionapp/variables.DEV.yaml
+- stage: QA_Test
+  pool: AI-TD-Windows-Build-Agents
+  variables:
+    - template: variables/tests/variables.release.yaml  
+    - template: variables/variables.QA.yaml    
+    - template: variables/tests/variables.QA.yaml  
+  jobs:
+  - deployment: QA_SmokeTest
+    displayName: QA Smoke Test
+    pool: AI-TD-Windows-Build-Agents
+    environment: QA  
+    strategy: 
+      runOnce:
+        deploy: 
+          steps:
+          - template: shared/test-steps.yaml
+            parameters:
+            - task: VSTest@2
+            displayName: 'VsTest - testPlan'
+         inputs:
+              testSelector: testPlan
+              TestType: 'Smoke Test CI'
+              TestPlan: '116430' # QA Automation
+              TestSuite: '116432' # QA Automation Plan\Smoke Test
+              TestConfiguration: '182' # Chrome Windows 10
+              AzureSubscription: 'AI Services QA - PZI-GXUS-N-SUB028'
+  - deployment: QA_RegressionTest
+    displayName: QA Regression Test
+    pool: AI-TD-Windows-Build-Agents
+    environment: QA  
+    strategy: 
+      runOnce:
+        deploy: 
+          steps:
+          - template: shared/test-steps.yaml
+            parameters:
+              TestType: 'Regression-CI'
+              TestPlan: '116430' # QA Automation
+              TestSuite: '116433' # QA Automation Plan\Regression Test
+              TestConfiguration: '182' # Chrome Windows 10
+              AzureSubscription: 'AI Services QA - PZI-GXUS-N-SUB028'
